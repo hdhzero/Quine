@@ -25,17 +25,6 @@ int QuineMcCluskey::hamming_distance(string& a, string& b) {
     return dist;
 }
 
-int QuineMcCluskey::ones_count(int a) {
-    int n = 0;
-
-    for (int i = 0; i < 32; ++i) {
-        if (a & (1 << i)) {
-            ++n;
-        }
-    }
-
-    return n;
-}
 
 void QuineMcCluskey::read_truth_table_from_file(string filename) {
     int row = 0;
@@ -59,21 +48,6 @@ void QuineMcCluskey::read_truth_table_from_file(string filename) {
     file.close();
 }
 
-void QuineMcCluskey::group_by_numbers_of_ones() {
-    int tmp;
-
-    sorted_minterms.resize(n_vars + 1);
-
-    for (int i = 0; i < minterms.size(); ++i) {
-        tmp = ones_count(minterms[i]);
-        sorted_minterms[tmp].push_back(minterms[i]);
-    }
-
-    for (int i = 0; i < dont_cares.size(); ++i) {
-        tmp = ones_count(dont_cares[i]);
-        sorted_minterms[tmp].push_back(dont_cares[i]);
-    }
-}
 
 string QuineMcCluskey::get_mask_for_group(vector<int>& g) {
     string mask;
@@ -124,10 +98,6 @@ void QuineMcCluskey::print_groups(vector<vector<int> >& groups) {
 
         cout << ")  " << get_mask_for_group(groups[i]) << "\n";
     }
-}
-
-bool QuineMcCluskey::can_join(vector<int>& a, vector<int>& b) {
-
 }
 
 void QuineMcCluskey::add_to_group(vector<vector<int> >& g, vector<int>& e) {
@@ -221,26 +191,94 @@ void QuineMcCluskey::first_combination() {
     print_groups(prime_implicants);
 }
 
-void QuineMcCluskey::debug() {
-    int size;
+void QuineMcCluskey::find_essential_implicants() {
+    int count;
+    int mterm;
+    int index;
+    bool extracted;
+    vector<int>::iterator b;
+    vector<int>::iterator e;
+    vector<int> minterms_tmp;
+    vector<vector<int> > prime_implicants_tmp;
 
-    group_by_numbers_of_ones();
-    cout << "Ordered by number of 1's\n";
+    extracted = true;
+    minterms_tmp = minterms;
+    prime_implicants_tmp = prime_implicants;
 
-    for (int i = 0; i <= n_vars; ++i) {
-        cout << i << ": ";
-        size = sorted_minterms[i].size();
+    while (extracted) {
+        extracted = false;
 
-        for (int j = 0; j < size; ++j) {
-            cout << sorted_minterms[i][j];
+        for (int i = 0; i < minterms_tmp.size(); ++i) {
+            count = 0;
+            mterm = minterms_tmp[i];
 
-            if (j < size - 1) {
-                cout << ", ";
+            for (int j = 0; j < prime_implicants_tmp.size(); ++j) {
+                b = prime_implicants_tmp[j].begin();
+                e = prime_implicants_tmp[j].end();
+
+                if (find(b, e, mterm) != e) {
+                    ++count;
+                    index = j;
+                }
+            }
+
+            if (count == 1) {
+                extracted = true;
+                add_to_group(essential_implicants, prime_implicants_tmp[index]);
             }
         }
 
-        cout << "\n";
-    }
+        if (extracted) {
+            count = 0;
 
+            cout << "remains: ";
+            print_groups(prime_implicants_tmp);
+
+            cout << "\n";
+            for (int i = 0; i < essential_implicants.size(); ++i) {
+                for (int j = 0; j < essential_implicants[i].size(); ++j) {
+                    b = minterms_tmp.begin();
+                    e = minterms_tmp.end();
+                    b = find(b, e, essential_implicants[i][j]);
+
+                    if (b != e) {
+                        int elem = *b;
+                        bool flag = true;
+                        minterms_tmp.erase(b);
+
+                        while (flag) {
+                            flag = false;
+
+                            for (int k = 0; k < prime_implicants_tmp.size(); ++k) {
+                                b = prime_implicants_tmp[k].begin();
+                                e = prime_implicants_tmp[k].end();
+
+                                b = find(b, e, elem);
+
+                                if (b != e) {
+                                    prime_implicants_tmp[k].clear();
+                                    flag = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            cout << "Minterms: ";
+            for (int i = 0; i < minterms_tmp.size(); ++i) {
+                cout << "{" << minterms_tmp[i] << "}";
+            }
+            cout << endl;
+        }
+    }
+}
+
+void QuineMcCluskey::debug() {
+    int size;
     first_combination();
+    find_essential_implicants();
+
+    cout << "Essential implicants:\n";
+    print_groups(essential_implicants);
 }
